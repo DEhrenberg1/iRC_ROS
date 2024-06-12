@@ -26,7 +26,7 @@ def generate_launch_description():
     prefix_arg = DeclareLaunchArgument("prefix", default_value="")
     controller_manager_name_arg = DeclareLaunchArgument(
         "controller_manager_name",
-        default_value=[LaunchConfiguration("namespace"), "/controller_manager"],
+        default_value= "/real/controller_manager",
     )
 
     default_rviz_file = PathJoinSubstitution(

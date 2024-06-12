@@ -10,12 +10,40 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <thread>
+#include <mutex>
+#include <chrono>
 
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "irc_ros_hardware/CRI/cri_keywords.hpp"
 #include "irc_ros_hardware/common/errorstate.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_lifecycle/state.hpp"
+#include "std_msgs/msg/string.hpp"
+
+class GripperControlNode : public rclcpp::Node {
+public:
+    GripperControlNode() : Node("gripper_control_node") {
+        subscriber_ = this->create_subscription<std_msgs::msg::String>(
+            "gripper_control", 10, std::bind(&GripperControlNode::controlCallback, this, std::placeholders::_1));
+    }
+
+    void controlCallback(const std_msgs::msg::String::SharedPtr msg) {
+        std::lock_guard<std::mutex> lock(gripper_mutex_);
+        command_ = msg->data;
+    }
+
+    std::string getCommand() {
+        std::lock_guard<std::mutex> lock(gripper_mutex_);
+        return command_;
+    }
+
+private:
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr subscriber_;
+    std::string command_;
+    std::mutex gripper_mutex_;
+};
+
 
 namespace irc_hardware
 {
@@ -75,6 +103,55 @@ void IrcRosCri::AliveThreadFunction()
 
   RCLCPP_WARN(rclcpp::get_logger("iRC_ROS"), "Stopped to send ALIVEJOG");
 }
+ void IrcRosCri::OpenGripper()
+ {
+     Command(cri_keywords::STATUS_DOUT + " 21 false");
+     Command(cri_keywords::STATUS_DOUT + " 23 true");
+     RCLCPP_WARN(rclcpp::get_logger("iRC_ROS"), "test");
+     
+ }
+ void IrcRosCri::CloseGripper()
+ {
+     Command(cri_keywords::STATUS_DOUT + " 23 false ");
+     Command(cri_keywords::STATUS_DOUT + " 21 true ");
+ }
+ void IrcRosCri::ReleaseGripper()
+ {
+     Command(cri_keywords::STATUS_DOUT + " 23 false");
+     Command(cri_keywords::STATUS_DOUT + " 21 false");
+ }
+ void IrcRosCri::NodeSpinFunction(std::shared_ptr<GripperControlNode> node){
+     rclcpp::spin(node);
+     rclcpp::shutdown();
+ }
+
+ void IrcRosCri::GripperThreadFunction(std::shared_ptr<GripperControlNode> node)
+ {
+    while (rclcpp::ok()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            std::string command = node->getCommand();
+
+            if (command == "open") {
+                OpenGripper();
+            } else if (command == "close") {
+                CloseGripper();
+            } else if (command == "release") {
+                ReleaseGripper();
+            }
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        }
+
+    //  while(true) {
+    //      std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    //      OpenGripper();
+    //      std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    //      CloseGripper();
+    //      std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    //      ReleaseGripper();
+    //      std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+    //  }
+ }
 
 void IrcRosCri::MessageThreadFunction()
 {
@@ -282,7 +359,7 @@ void IrcRosCri::CmdMove()
   msg << std::fixed << std::setprecision(1);
 
   // Add the joint goals as degrees
-  for (int i = 0; i < 0; i < set_pos_.size()) {
+  for (int i = 0;  i < set_pos_.size(); i++) {
     msg << (set_pos_[i] * 180 / M_PI) + pos_offset_[i] << " ";
   }
 
@@ -356,8 +433,14 @@ hardware_interface::CallbackReturn IrcRosCri::on_init(const hardware_interface::
 hardware_interface::CallbackReturn IrcRosCri::on_activate(
   const rclcpp_lifecycle::State & previous_state)
 {
+  int argc = 0;
+  char **argv = nullptr;
+  // rclcpp::init(argc, argv);
+  auto node = std::make_shared<GripperControlNode>();
   continueMessage = true;
   messageThread = std::thread(&IrcRosCri::MessageThreadFunction, this);
+  gripperThread = std::thread(&IrcRosCri::GripperThreadFunction, this, node);
+  nodeSpin = std::thread(&IrcRosCri::NodeSpinFunction, this, node);
 
   crisocket.Start();
 
@@ -430,7 +513,9 @@ std::vector<hardware_interface::StateInterface> IrcRosCri::export_state_interfac
 std::vector<hardware_interface::CommandInterface> IrcRosCri::export_command_interfaces()
 {
   std::vector<hardware_interface::CommandInterface> command_interfaces;
-
+RCLCPP_WARN(
+        rclcpp::get_logger("iRC_ROS"),
+        "I HAVE %i JOINTS \n", info_.joints.size());
   for (int i = 0; i < info_.joints.size(); i++) {
     command_interfaces.emplace_back(hardware_interface::CommandInterface(
       info_.joints[i].name, hardware_interface::HW_IF_POSITION, &set_pos_[i]));
@@ -499,6 +584,9 @@ hardware_interface::return_type IrcRosCri::write(const rclcpp::Time &, const rcl
     // TODO: Find ros2_controller which only sends the final position once or wait for a protocol
     // update for CRI (Issue #72)
     if (set_pos_ != set_pos_last_) {
+RCLCPP_WARN(
+        rclcpp::get_logger("iRC_ROS"),
+        "I HAVE %i JOINTS \n", set_pos_.size());
       CmdMove();
       set_pos_last_ = set_pos_;
     }

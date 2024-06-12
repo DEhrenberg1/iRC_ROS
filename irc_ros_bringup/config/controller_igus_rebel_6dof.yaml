@@ -7,6 +7,8 @@
 
     joint_trajectory_controller:
       type: joint_trajectory_controller/JointTrajectoryController
+    velocity_controller:
+      type: velocity_controllers/JointGroupVelocityController
 
     dio_controller:
       type: irc_ros_controllers/DIOController
@@ -16,6 +18,29 @@
 
     dashboard_controller:
       type: irc_ros_controllers/DashboardController
+
+<namespace>/velocity_controller:
+  ros__parameters:
+    joints: 
+      - <prefix>joint1
+      - <prefix>joint2
+      - <prefix>joint3
+      - <prefix>joint4
+      - <prefix>joint5
+      - <prefix>joint6
+
+    command_interfaces:
+      - velocity
+
+    state_interfaces:
+      - position
+      - velocity
+
+    state_publish_rate: 100.0 # Defaults to 50
+    action_monitor_rate: 100.0 # Defaults to 20
+
+    open_loop_control: true
+    allow_partial_joints_goal: true
 
 <namespace>/joint_trajectory_controller:
   ros__parameters:
@@ -28,10 +53,13 @@
       - <prefix>joint6
 
     command_interfaces:
-      - position
+      - velocity
 
     state_interfaces:
       - position
+      - velocity
+
+    cmd_timeout: 0.63
 
     state_publish_rate: 100.0 # Defaults to 50
     action_monitor_rate: 100.0 # Defaults to 20

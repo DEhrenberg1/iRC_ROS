@@ -12,6 +12,8 @@
 #include "hardware_interface/system_interface.hpp"
 #include "hardware_interface/types/hardware_interface_return_values.hpp"
 
+class GripperControlNode;
+
 namespace irc_hardware
 {
 class IrcRosCri : public hardware_interface::SystemInterface
@@ -35,6 +37,8 @@ private:
   bool continueMessage;
   std::thread aliveThread;
   std::thread messageThread;
+  std::thread gripperThread;
+  std::thread nodeSpin;
   int aliveWaitMs;
 
   int cmd_counter;
@@ -64,6 +68,12 @@ private:
   // Thread functions
   void AliveThreadFunction();
   void MessageThreadFunction();
+
+  void GripperThreadFunction(std::shared_ptr<GripperControlNode> node);
+  void ReleaseGripper();
+  void OpenGripper();
+  void CloseGripper();
+  void NodeSpinFunction(std::shared_ptr<GripperControlNode> node);
 
   // Other functions
   int get_cmd_counter();
