@@ -254,7 +254,7 @@ def generate_launch_description():
 
     # Robot nodes
     description.add_action(robot_state_pub)
-    description.add_action(joint_state_pub)
+    #description.add_action(joint_state_pub)
 
     # ROS2 Control nodes
     description.add_action(control_node)

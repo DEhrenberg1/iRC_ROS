@@ -105,8 +105,8 @@ void IrcRosCri::AliveThreadFunction()
 }
  void IrcRosCri::OpenGripper()
  {
-     Command(cri_keywords::STATUS_DOUT + " 21 false");
-     Command(cri_keywords::STATUS_DOUT + " 23 true");
+     Command(cri_keywords::STATUS_DOUT + " 21 false ");
+     Command(cri_keywords::STATUS_DOUT + " 23 true ");
      RCLCPP_WARN(rclcpp::get_logger("iRC_ROS"), "test");
      
  }
@@ -117,8 +117,8 @@ void IrcRosCri::AliveThreadFunction()
  }
  void IrcRosCri::ReleaseGripper()
  {
-     Command(cri_keywords::STATUS_DOUT + " 23 false");
-     Command(cri_keywords::STATUS_DOUT + " 21 false");
+     Command(cri_keywords::STATUS_DOUT + " 23 false ");
+     Command(cri_keywords::STATUS_DOUT + " 21 false ");
  }
  void IrcRosCri::NodeSpinFunction(std::shared_ptr<GripperControlNode> node){
      rclcpp::spin(node);
@@ -127,30 +127,25 @@ void IrcRosCri::AliveThreadFunction()
 
  void IrcRosCri::GripperThreadFunction(std::shared_ptr<GripperControlNode> node)
  {
+    std::string state = "default";
     while (rclcpp::ok()) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             std::string command = node->getCommand();
-
-            if (command == "open") {
-                OpenGripper();
-            } else if (command == "close") {
-                CloseGripper();
-            } else if (command == "release") {
-                ReleaseGripper();
+            if (command != state){
+              if (command == "open") {
+                  OpenGripper();
+                  state = "open";
+              } else if (command == "close") {
+                  CloseGripper();
+                  state = "close";
+              } else if (command == "release") {
+                  ReleaseGripper();
+                  state = "release";
+              }
             }
 
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
-
-    //  while(true) {
-    //      std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-    //      OpenGripper();
-    //      std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-    //      CloseGripper();
-    //      std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-    //      ReleaseGripper();
-    //      std::this_thread::sleep_for(std::chrono::milliseconds(5000));
-    //  }
  }
 
 void IrcRosCri::MessageThreadFunction()
